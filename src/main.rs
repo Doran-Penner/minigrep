@@ -34,6 +34,5 @@ fn run(config: Config) -> Result<(), Box<dyn Error>> {
 fn main() -> Result<(), Box<dyn Error>> {
     let args = env::args();
     let config = Config::build(args)?;
-    run(config)?;
-    Ok(())
+    run(config)
 }
