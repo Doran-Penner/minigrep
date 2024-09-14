@@ -1,5 +1,5 @@
 use std::error::Error;
-use std::fs;
+use std::{fs, iter};
 
 pub struct Config {
     query: String,
@@ -19,13 +19,21 @@ impl Config {
 }
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
-    let contents = fs::read_to_string(config.filepath)?;
-    todo!("{}", contents)
+    let contents = fs::read_to_string(&config.filepath)?;
+
+    for (line_num, line) in search(&config.query, &contents) {
+        println!("{}: {}", line_num, line);
+    }
+
+    Ok(())
 }
 
 // @optimize: best type of string to pass around?
-pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
-    contents.lines().filter(|line| line.contains(query)).collect()
+pub fn search<'a>(query: &'a str, contents: &'a str) -> impl Iterator<Item = (u32, &'a str)> + 'a {
+    // @learn I'm not sure how I feel about the closure owning query, what does that actually mean?
+    // does it take it from the external Config or just this function's input?
+    // Surely this one, since query was passed in as an immutable reference
+    iter::zip(1.., contents.lines()).filter(move |(_, line)| line.contains(query))
 }
 
 #[cfg(test)]
@@ -33,15 +41,38 @@ mod tests {
     use super::*;
 
     #[test]
-    fn one_result() {
+    fn test_search() {
         let contents = "\
 Rust:
 safe, fast, productive.
-Pick three.".to_string();
-        assert_eq!(vec!["safe, fast, productive."], search("duct", &contents));
-        assert_eq!(vec!["safe, fast, productive."], search("safe", &contents));
-        assert_eq!(vec!["Rust:"], search("R", &contents));
-        assert_eq!(vec!["safe, fast, productive.", "Pick three."], search(".", &contents));
-        assert_eq!(vec!["Rust:", "safe, fast, productive.", "Pick three."], search("t", &contents));
+Pick three."
+            .to_string();
+        assert_eq!(
+            vec![(2, "safe, fast, productive.")],
+            search("duct", &contents).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            vec![(2, "safe, fast, productive.")],
+            search("safe", &contents).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            vec![(1, "Rust:")],
+            search("R", &contents).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            vec![(2, "safe, fast, productive."), (3, "Pick three.")],
+            search(".", &contents).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            vec![
+                (1, "Rust:"),
+                (2, "safe, fast, productive."),
+                (3, "Pick three.")
+            ],
+            search("t", &contents).collect::<Vec<_>>()
+        );
     }
+
+    // @production: I could add more tests for each thing, or extract the read_to_string from run,
+    // or other things
 }

@@ -1,4 +1,4 @@
-use minigrep::{Config, run};
+use minigrep::{run, Config};
 use std::env;
 use std::error::Error;
 
