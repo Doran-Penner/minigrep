@@ -1,4 +1,4 @@
-use std::{ env, fs, process };
+use std::{env, fs, io};
 
 /* Notes
  * I'm doing the arg parsing differently than the guide,
@@ -7,31 +7,38 @@ use std::{ env, fs, process };
 
 struct Config {
     query: String,
-    filepath: String
+    filepath: String,
 }
 
 impl Config {
-    fn build(mut args: env::Args) -> Result<Self, &'static str> {
-        let _name = args.next();
+    fn build(mut args: env::Args) -> Result<Self, io::Error> {
+        args.next(); // get rid of executable name
         let query_opt = args.next();
         let filepath_opt = args.next();
         match (query_opt, filepath_opt) {
             (Some(query), Some(filepath)) => Ok(Config { query, filepath }),
-            (_, _) => Err("expected 2 arguments, query and filepath"),
+            // @detail should it be a String? Rust was happy to convert it before...
+            (_, _) => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Expected two arguments, query and filepath",
+            )),
         }
     }
 }
 
-fn main() {
+// @fancy it prints the final error a bit weirdly, what's the best way to do it?
+fn main() -> Result<(), io::Error> {
     let args = env::args();
-    let config = Config::build(args).unwrap_or_else(|msg| {
-        println!("Error parsing config: {}", msg);
-        process::exit(1);
-    });
-    println!("Searching for \"{}\" in file path {}", config.query, config.filepath);
+    let config = Config::build(args)?;
+    println!(
+        "Searching for \"{}\" in file path {}",
+        config.query, config.filepath
+    );
 
     // @graceful: file not found or badly read
-    let contents = fs::read_to_string(config.filepath).expect("Couldn't read file :(");
+    let contents = fs::read_to_string(config.filepath)?;
 
     println!("contents of file are:\n{contents}");
+
+    Ok(())
 }
