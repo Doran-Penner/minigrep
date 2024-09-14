@@ -19,14 +19,29 @@ impl Config {
 }
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
-    println!(
-        "Searching for \"{}\" in file path {}",
-        config.query, config.filepath
-    );
-
     let contents = fs::read_to_string(config.filepath)?;
-
-    println!("contents of file are:\n{contents}");
-    todo!()
+    todo!("{}", contents)
 }
 
+// @optimize: best type of string to pass around?
+pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
+    contents.lines().filter(|line| line.contains(query)).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn one_result() {
+        let contents = "\
+Rust:
+safe, fast, productive.
+Pick three.".to_string();
+        assert_eq!(vec!["safe, fast, productive."], search("duct", &contents));
+        assert_eq!(vec!["safe, fast, productive."], search("safe", &contents));
+        assert_eq!(vec!["Rust:"], search("R", &contents));
+        assert_eq!(vec!["safe, fast, productive.", "Pick three."], search(".", &contents));
+        assert_eq!(vec!["Rust:", "safe, fast, productive.", "Pick three."], search("t", &contents));
+    }
+}
