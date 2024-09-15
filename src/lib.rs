@@ -1,5 +1,4 @@
-use std::error::Error;
-use std::{env, fs, iter};
+use std::{env, error, fs, iter};
 
 pub struct Config {
     query: String,
@@ -8,7 +7,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn build(mut args: impl Iterator<Item = String>) -> Result<Self, Box<dyn Error>> {
+    pub fn build(mut args: impl Iterator<Item = String>) -> Result<Self, Box<dyn error::Error>> {
         let sensitive = env::var("IGNORE_CASE").is_err();
         args.next(); // gets rid of executable name
         let query_opt = args.next();
@@ -24,7 +23,7 @@ impl Config {
     }
 }
 
-pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
+pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
     let contents = fs::read_to_string(&config.filepath)?;
 
     for (line_num, line) in search(&config.query, &contents, config.sensitive) {
@@ -40,8 +39,6 @@ pub fn search<'a>(
     case_sensitive: bool,
 ) -> impl Iterator<Item = (u32, &'a str)> + 'a {
     iter::zip(1.., contents.lines()).filter(move |(_, line)| {
-        // @optimize: I'm turning every element into a String at some point,
-        // is there a more efficient way to do this? (no no no pls leave it alone)
         (if case_sensitive {
             line.to_string()
         } else {
