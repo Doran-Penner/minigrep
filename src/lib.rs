@@ -1,4 +1,5 @@
-use std::{env, error, fs, iter};
+use std::{env, error, fs, iter, io};
+use std::io::{BufReader, BufRead};
 
 pub struct Config {
     query: String,
@@ -24,9 +25,10 @@ impl Config {
 }
 
 pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
-    let contents = fs::read_to_string(&config.filepath)?;
+    let file = fs::File::open(&config.filepath)?;
+    let reader = BufReader::new(file);
 
-    for (line_num, line) in search(&config.query, &contents, config.sensitive) {
+    for (line_num, line) in search(&config.query, reader, config.sensitive) {
         println!("{}: {}", line_num, line);
     }
 
@@ -35,14 +37,17 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
 
 pub fn search<'a>(
     query: &'a str,
-    contents: &'a str,
+    reader: BufReader<fs::File>,
     case_sensitive: bool,
-) -> impl Iterator<Item = (u32, &'a str)> + 'a {
-    iter::zip(1.., contents.lines()).filter(move |(_, line)| {
+) -> impl Iterator<Item = (u32, String)> + 'a {
+    let lines = reader.lines();
+    let with_linenums = iter::zip(1.., lines);
+    let matches = move |(_, line): &(u32, Result<String, io::Error>)| {
         (if case_sensitive {
-            line.to_string()
+            // @todo: don't just unwrap
+            line.unwrap()
         } else {
-            line.to_lowercase()
+            line.unwrap().to_lowercase()
         })
         .contains(
             &(if case_sensitive {
@@ -51,7 +56,8 @@ pub fn search<'a>(
                 query.to_lowercase()
             }),
         )
-    })
+    };
+    with_linenums.filter(matches)
 }
 
 #[cfg(test)]
