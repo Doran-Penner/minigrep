@@ -8,26 +8,22 @@ enum Query {
 
 pub struct Config {
     query: Query,
-    // @learn: can I avoid a box?
-    filepath: Box<path::Path>,
+    filepath: path::PathBuf,
 }
 
 impl Config {
     pub fn build(mut args: impl Iterator<Item = String>) -> Result<Self, Box<dyn error::Error>> {
-        // @fancy: use args_os in main and change code accordingly
         let sensitive = env::var("IGNORE_CASE").is_err();
         args.next(); // gets rid of executable name
         let query_opt = args.next();
         let filepath_opt = args.next();
         match (query_opt, filepath_opt) {
             (Some(query_str), Some(filepath_str)) => {
-                let query = if sensitive {
-                    Query::CaseSens(query_str)
-                } else {
-                    Query::CaseInsens(query_str.to_lowercase())
+                let query = match sensitive {
+                    true => Query::CaseSens(query_str),
+                    false => Query::CaseInsens(query_str.to_lowercase()),
                 };
-                let filepath: Box<path::Path> = path::Path::new(&filepath_str).into();
-                // @fancy: use filepath.exists or filepath.try_exists for better error
+                let filepath = path::PathBuf::from(filepath_str);
                 match filepath.exists() {
                     true => Ok(Config { query, filepath }),
                     false => Err("Could not access file".into()),
@@ -41,28 +37,26 @@ impl Config {
 pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
     let file = fs::File::open(&config.filepath)?;
     let reader = BufReader::new(file);
-    let lines = reader.lines();
-    let with_linenums = iter::zip(1.., lines);
-    for line in with_linenums {
-        handler(line, &config.query)?;
+    let lines_with_linenums = iter::zip(1.., reader.lines());
+    for line_pair in lines_with_linenums {
+        printer(line_pair, &config.query)?;
     }
 
     Ok(())
 }
 
-fn handler(line: (u32, Result<String, io::Error>), query: &Query) -> Result<(), io::Error> {
-    // @clean: better var names (they degrade around here)
-    let (idx, val_result) = line;
-    let mut val = val_result?;
+fn printer(line_pair: (u32, Result<String, io::Error>), query: &Query) -> Result<(), io::Error> {
+    let (index, line_res) = line_pair;
+    let mut line = line_res?;
     let query_str = match query {
         Query::CaseSens(q) => q,
         Query::CaseInsens(q) => {
-            val = val.to_lowercase();
+            line = line.to_lowercase();
             q
         }
     };
-    if val.contains(query_str) {
-        println!("{}: {}", idx, val);
+    if line.contains(query_str) {
+        println!("{}: {}", index, line);
     };
     Ok(())
 }
