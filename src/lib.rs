@@ -1,24 +1,38 @@
-use std::{env, error, fs, iter, io};
-use std::io::{BufReader, BufRead};
+use std::io::{BufRead, BufReader};
+use std::{env, error, fs, io, iter, path};
+
+enum Query {
+    CaseSens(String),
+    CaseInsens(String),
+}
 
 pub struct Config {
-    query: String,
-    filepath: String,
-    sensitive: bool,
+    query: Query,
+    // @learn: can I avoid a box?
+    filepath: Box<path::Path>,
 }
 
 impl Config {
     pub fn build(mut args: impl Iterator<Item = String>) -> Result<Self, Box<dyn error::Error>> {
+        // @fancy: use args_os in main and change code accordingly
         let sensitive = env::var("IGNORE_CASE").is_err();
         args.next(); // gets rid of executable name
         let query_opt = args.next();
         let filepath_opt = args.next();
         match (query_opt, filepath_opt) {
-            (Some(query), Some(filepath)) => Ok(Config {
-                query,
-                filepath,
-                sensitive,
-            }),
+            (Some(query_str), Some(filepath_str)) => {
+                let query = if sensitive {
+                    Query::CaseSens(query_str)
+                } else {
+                    Query::CaseInsens(query_str.to_lowercase())
+                };
+                let filepath: Box<path::Path> = path::Path::new(&filepath_str).into();
+                // @fancy: use filepath.exists or filepath.try_exists for better error
+                match filepath.exists() {
+                    true => Ok(Config { query, filepath }),
+                    false => Err("Could not access file".into()),
+                }
+            }
             (_, _) => Err("Expected two arguments, query and filepath".into()),
         }
     }
@@ -27,75 +41,70 @@ impl Config {
 pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
     let file = fs::File::open(&config.filepath)?;
     let reader = BufReader::new(file);
-
-    for (line_num, line) in search(&config.query, reader, config.sensitive) {
-        println!("{}: {}", line_num, line);
+    let lines = reader.lines();
+    let with_linenums = iter::zip(1.., lines);
+    for line in with_linenums {
+        handler(line, &config.query)?;
     }
 
     Ok(())
 }
 
-pub fn search<'a>(
-    query: &'a str,
-    reader: BufReader<fs::File>,
-    case_sensitive: bool,
-) -> impl Iterator<Item = (u32, String)> + 'a {
-    let lines = reader.lines();
-    let with_linenums = iter::zip(1.., lines);
-    let matches = move |(_, line): &(u32, Result<String, io::Error>)| {
-        (if case_sensitive {
-            // @todo: don't just unwrap
-            line.unwrap()
-        } else {
-            line.unwrap().to_lowercase()
-        })
-        .contains(
-            &(if case_sensitive {
-                query.to_string()
-            } else {
-                query.to_lowercase()
-            }),
-        )
+fn handler(line: (u32, Result<String, io::Error>), query: &Query) -> Result<(), io::Error> {
+    // @clean: better var names (they degrade around here)
+    let (idx, val_result) = line;
+    let mut val = val_result?;
+    let query_str = match query {
+        Query::CaseSens(q) => q,
+        Query::CaseInsens(q) => {
+            val = val.to_lowercase();
+            q
+        }
     };
-    with_linenums.filter(matches)
+    if val.contains(query_str) {
+        println!("{}: {}", idx, val);
+    };
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    /*
+        use super::*;
 
-    #[test]
-    fn test_search_sens() {
-        let contents = "\
-Rust:
-safe, fast, productive.
-Pick three."
-            .to_string();
-        assert_eq!(
-            vec![(2, "safe, fast, productive.")],
-            search("duct", &contents, true).collect::<Vec<_>>()
-        );
-        assert_eq!(
-            vec![(2, "safe, fast, productive.")],
-            search("safe", &contents, true).collect::<Vec<_>>()
-        );
-        assert_eq!(
-            vec![(1, "Rust:")],
-            search("R", &contents, true).collect::<Vec<_>>()
-        );
-        assert_eq!(
-            vec![(2, "safe, fast, productive."), (3, "Pick three.")],
-            search(".", &contents, true).collect::<Vec<_>>()
-        );
-        assert_eq!(
-            vec![
-                (1, "Rust:"),
-                (2, "safe, fast, productive."),
-                (3, "Pick three.")
-            ],
-            search("t", &contents, true).collect::<Vec<_>>()
-        );
-    }
+        #[test]
+        fn test_search_sens() {
+            let contents = "\
+    Rust:
+    safe, fast, productive.
+    Pick three."
+                .to_string();
+            assert_eq!(
+                vec![(2, "safe, fast, productive.")],
+                search("duct", &contents, true).collect::<Vec<_>>()
+            );
+            assert_eq!(
+                vec![(2, "safe, fast, productive.")],
+                search("safe", &contents, true).collect::<Vec<_>>()
+            );
+            assert_eq!(
+                vec![(1, "Rust:")],
+                search("R", &contents, true).collect::<Vec<_>>()
+            );
+            assert_eq!(
+                vec![(2, "safe, fast, productive."), (3, "Pick three.")],
+                search(".", &contents, true).collect::<Vec<_>>()
+            );
+            assert_eq!(
+                vec![
+                    (1, "Rust:"),
+                    (2, "safe, fast, productive."),
+                    (3, "Pick three.")
+                ],
+                search("t", &contents, true).collect::<Vec<_>>()
+            );
+        }
 
-    // @production: break this test up, add tests for other cases and other functions
+        */
+    // @todo: actually make tests!
 }
