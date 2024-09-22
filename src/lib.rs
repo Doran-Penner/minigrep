@@ -59,20 +59,23 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
     let reader = BufReader::new(file);
     let lines_with_linenums = iter::zip(1.., reader.lines());
     for line_pair in lines_with_linenums {
-        // @next: turn "printer" into "matcher" that returns things so run can print them
-        printer(line_pair, &config.query)?;
+        matcher(line_pair, &config.query)?.map(|str| println!("{}", str)); // .map only does it if it's not None (monad :D)
     }
 
     Ok(())
 }
 
-fn printer(line_pair: (u32, Result<String, io::Error>), query: &Query) -> Result<(), io::Error> {
+fn matcher(
+    line_pair: (u32, Result<String, io::Error>),
+    query: &Query,
+) -> Result<Option<String>, io::Error> {
     let (index, line_res) = line_pair;
     let line = line_res?;
-    if query.found_in(&line) {
-        println!("{}: {}", index, line);
-    };
-    Ok(())
+    match query.found_in(&line) {
+        // @feature: some way to specify formatting style
+        true => Ok(Some(format!("{}: {}", index, line))),
+        false => Ok(None),
+    }
 }
 
 #[cfg(test)]
