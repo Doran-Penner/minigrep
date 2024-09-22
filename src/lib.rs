@@ -1,9 +1,32 @@
 use std::io::{BufRead, BufReader};
 use std::{env, error, fs, io, iter, path};
 
-enum Query {
-    CaseSens(String),
-    CaseInsens(String),
+struct Query {
+    query_str: String,
+    case_sensitive: bool,
+}
+
+impl Query {
+    fn new(mut query_str: String, case_sensitive: bool) -> Self {
+        if !case_sensitive {
+            query_str = query_str.to_lowercase();
+        };
+        Query {
+            query_str,
+            case_sensitive,
+        }
+    }
+    fn found_in(&self, other: &str) -> bool {
+        // @lifetime: can I avoid this code duplication?
+        match self.case_sensitive {
+            true => other.contains(&self.query_str),
+            false => {
+                // shadowing variable to avoid lifetimes
+                let other = &other.to_lowercase();
+                other.contains(&self.query_str)
+            }
+        }
+    }
 }
 
 pub struct Config {
@@ -19,10 +42,7 @@ impl Config {
         let filepath_opt = args.next();
         match (query_opt, filepath_opt) {
             (Some(query_str), Some(filepath_str)) => {
-                let query = match sensitive {
-                    true => Query::CaseSens(query_str),
-                    false => Query::CaseInsens(query_str.to_lowercase()),
-                };
+                let query = Query::new(query_str, sensitive);
                 let filepath = path::PathBuf::from(filepath_str);
                 match filepath.exists() {
                     true => Ok(Config { query, filepath }),
@@ -39,6 +59,7 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
     let reader = BufReader::new(file);
     let lines_with_linenums = iter::zip(1.., reader.lines());
     for line_pair in lines_with_linenums {
+        // @next: turn "printer" into "matcher" that returns things so run can print them
         printer(line_pair, &config.query)?;
     }
 
@@ -47,15 +68,8 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
 
 fn printer(line_pair: (u32, Result<String, io::Error>), query: &Query) -> Result<(), io::Error> {
     let (index, line_res) = line_pair;
-    let mut line = line_res?;
-    let query_str = match query {
-        Query::CaseSens(q) => q,
-        Query::CaseInsens(q) => {
-            line = line.to_lowercase();
-            q
-        }
-    };
-    if line.contains(query_str) {
+    let line = line_res?;
+    if query.found_in(&line) {
         println!("{}: {}", index, line);
     };
     Ok(())
