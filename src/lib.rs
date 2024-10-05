@@ -1,4 +1,4 @@
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, LineWriter, Write};
 use std::{env, error, fs, io, iter, path};
 
 struct Query {
@@ -39,6 +39,7 @@ impl Config {
         let sensitive = env::var("IGNORE_CASE").is_err();
         args.next(); // gets rid of executable name
         let query_opt = args.next();
+        // @feature (crazy): make it work with stdin
         let filepath_opt = args.next();
         match (query_opt, filepath_opt) {
             (Some(query_str), Some(filepath_str)) => {
@@ -57,6 +58,7 @@ impl Config {
 pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
     let file = fs::File::open(&config.filepath)?;
     let reader = BufReader::new(file);
+    let mut writer = LineWriter::new(io::stdout());
     // thank youuuuu patrick
     iter::zip(1.., reader.lines()) // add line numbers to file lines; now
         .try_for_each(|line_pair| {
@@ -64,8 +66,7 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
             // if the file reading was successful and there was a match
             if let Some(str) = matcher(line_pair, &config.query)? {
                 // then print it
-                println!("{}", str);
-                // @perf: use io::LineWriter for **blazingly fast writing**
+                writer.write_all(str.as_bytes())?;
             };
             Ok(())
         })
@@ -79,7 +80,7 @@ fn matcher(
     let line = line_res?;
     match query.found_in(&line) {
         // @feature: some way to specify formatting style
-        true => Ok(Some(format!("{}: {}", index, line))),
+        true => Ok(Some(format!("{}: {}\n", index, line))),
         false => Ok(None),
     }
 }
