@@ -57,12 +57,18 @@ impl Config {
 pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
     let file = fs::File::open(&config.filepath)?;
     let reader = BufReader::new(file);
-    let lines_with_linenums = iter::zip(1.., reader.lines());
-    for line_pair in lines_with_linenums {
-        matcher(line_pair, &config.query)?.map(|str| println!("{}", str)); // .map only does it if it's not None (monad :D)
-    }
-
-    Ok(())
+    // thank youuuuu patrick
+    iter::zip(1.., reader.lines()) // add line numbers to file lines; now
+        .try_for_each(|line_pair| {
+            // for each line,
+            // if the file reading was successful and there was a match
+            if let Some(str) = matcher(line_pair, &config.query)? {
+                // then print it
+                println!("{}", str);
+                // @perf: use io::LineWriter for **blazingly fast writing**
+            };
+            Ok(())
+        })
 }
 
 fn matcher(
