@@ -1,6 +1,12 @@
 use std::io::{BufRead, BufReader, LineWriter, Write};
 use std::{env, error, fs, io, iter, path};
 
+/* goals:
+ * if one file (including stdin), just do that
+ * if directory... print each file name?
+ * (can we get bat-like functionality?)
+ */
+
 struct Query {
     query_str: String,
     case_sensitive: bool,

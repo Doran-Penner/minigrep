@@ -1,3 +1,5 @@
+# Following the Tutorial Too Far (ftttf)
+
 This is a small pet project evolving from the Rust Book's
 [I/O project](https://doc.rust-lang.org/book/ch12-00-an-io-project.html).
 The goal is to learn things via unnecessary tweaks for readability, performance,
