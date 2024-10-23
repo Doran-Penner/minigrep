@@ -28,7 +28,7 @@ impl Query {
             true => other.contains(&self.query_str),
             false => {
                 // shadowing variable to avoid lifetimes
-                let other = &other.to_lowercase();
+                let other = other.to_lowercase();
                 other.contains(&self.query_str)
             }
         }
@@ -44,19 +44,14 @@ impl Config {
     pub fn build(mut args: impl Iterator<Item = String>) -> Result<Self, Box<dyn error::Error>> {
         let sensitive = env::var("IGNORE_CASE").is_err();
         args.next(); // gets rid of executable name
-        let query_opt = args.next();
-        // @feature (crazy): make it work with stdin
-        let filepath_opt = args.next();
-        match (query_opt, filepath_opt) {
-            (Some(query_str), Some(filepath_str)) => {
-                let query = Query::new(query_str, sensitive);
-                let filepath = path::PathBuf::from(filepath_str);
-                match filepath.exists() {
-                    true => Ok(Config { query, filepath }),
-                    false => Err("Could not access file".into()),
-                }
-            }
-            (_, _) => Err("Expected two arguments, query and filepath".into()),
+        let query_str = args.next().ok_or("Expected first argument, query")?;
+        // @feature (crazy): make it flexibly work with stdin or given filepath
+        let filepath_str = args.next().ok_or("Expected second argument, filepath")?;
+        let query = Query::new(query_str, sensitive);
+        let filepath = path::PathBuf::from(filepath_str);
+        match filepath.try_exists() {
+            Ok(true) => Ok(Config { query, filepath }),
+            _ => Err("Could not access file".into()),
         }
     }
 }
