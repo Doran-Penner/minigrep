@@ -1,4 +1,4 @@
-# Following the Tutorial Too Far (ftttf)
+# Following the Manual Too Far (ftmtf)
 
 This is a small pet project evolving from the Rust Book's
 [I/O project](https://doc.rust-lang.org/book/ch12-00-an-io-project.html).
