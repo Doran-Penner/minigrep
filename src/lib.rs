@@ -62,10 +62,12 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
     let mut writer = LineWriter::new(io::stdout());
     // thank youuuuu patrick
     iter::zip(1.., reader.lines()) // add line numbers to file lines; now
-        .try_for_each(|line_pair| {
+        .try_for_each(|(index, line_res)| {
             // for each line,
-            // if the file reading was successful and there was a match
-            if let Some(str) = matcher(line_pair, &config.query)? {
+            // if the file reading was successful
+            let line = line_res?;
+            // and there was a match
+            if let Some(str) = matcher(index, line, &config.query) {
                 // then print it
                 writer.write_all(str.as_bytes())?;
             };
@@ -73,16 +75,11 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
         })
 }
 
-fn matcher(
-    line_pair: (u32, Result<String, io::Error>),
-    query: &Query,
-) -> Result<Option<String>, io::Error> {
-    let (index, line_res) = line_pair;
-    let line = line_res?;
+fn matcher(index: u32, line: String, query: &Query) -> Option<String> {
     match query.found_in(&line) {
         // @feature: some way to specify formatting style
-        true => Ok(Some(format!("{}: {}\n", index, line))),
-        false => Ok(None),
+        true => Some(format!("{}: {}\n", index, line)),
+        false => None,
     }
 }
 
