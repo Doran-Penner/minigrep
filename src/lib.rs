@@ -56,6 +56,14 @@ impl Config {
     }
 }
 
+fn matcher(index: u32, line: String, query: &Query) -> Option<String> {
+    match query.found_in(&line) {
+        // @feature: some way to specify formatting style
+        true => Some(format!("{}: {}\n", index, line)),
+        false => None,
+    }
+}
+
 pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
     let file = fs::File::open(&config.filepath)?;
     let reader = BufReader::new(file);
@@ -73,14 +81,6 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
             };
             Ok(())
         })
-}
-
-fn matcher(index: u32, line: String, query: &Query) -> Option<String> {
-    match query.found_in(&line) {
-        // @feature: some way to specify formatting style
-        true => Some(format!("{}: {}\n", index, line)),
-        false => None,
-    }
 }
 
 #[cfg(test)]
